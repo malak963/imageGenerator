@@ -1,0 +1,194 @@
+// العناصر
+const themeToggle = document.querySelector('.theme-toggle'); 
+const promptBtn = document.querySelector('.prompt-btn');
+const promptInput = document.querySelector('.prompt-input');
+const promptForm = document.querySelector('.prompt-form');
+const modelSelect = document.querySelector('#model-select');
+const countSelect = document.querySelector('#count-select');
+const ratioSelect = document.querySelector('#ratio-select');
+const galleryGrid = document.querySelector('.gallery-grid');
+
+// مفتاح AI Horde (احصلي عليه من https://aihorde.net/register)
+const HORDE_API_KEY = "Y6KL-bWBg9g9soKB7oYLPw";
+
+// أمثلة عشوائية
+const examplePrompts = [
+  "A magic forest with glowing plants and fairy homes among giant mushrooms",
+  "A futuristic Mars colony under glass domes with gardens",
+  "A dragon sleeping on gold coins in a crystal cave",
+  "A cyberpunk city with neon signs and flying cars at night",
+  "A Japanese shrine during cherry blossom season with lanterns",
+];
+
+// ---- تهيئة الثيم ----
+(() => {
+  const savedTheme = localStorage.getItem('theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches; 
+  const isDarkTheme = savedTheme === "dark" || (!savedTheme && systemPrefersDark);
+  document.body.classList.toggle('dark-theme', isDarkTheme);
+  themeToggle.querySelector("i").className = isDarkTheme ? "fa-solid fa-sun" : "fa-solid fa-moon";
+})();
+
+const toggleTheme = () => {
+  const isDarkTheme = document.body.classList.toggle('dark-theme');
+  localStorage.setItem('theme', isDarkTheme ? "dark" : "light");
+  themeToggle.querySelector("i").className = isDarkTheme ? "fa-solid fa-sun" : "fa-solid fa-moon";
+};
+
+// ---- توليد عشوائي ----
+const generateImage = () => {
+  const prompt = examplePrompts[Math.floor(Math.random() * examplePrompts.length)];
+  promptInput.value = prompt;
+  promptInput.focus();
+};
+
+// ---- حساب الأبعاد ----
+const getImageDimensions = (aspectRatio, baseSize = 512) => {
+  const [width, height] = aspectRatio.split("/").map(Number);
+  const scaleFactor = baseSize / Math.sqrt(width * height);
+  let calculatedWidth = Math.round(scaleFactor * width);
+  let calculatedHeight = Math.round(scaleFactor * height);
+  calculatedWidth = Math.floor(calculatedWidth / 16) * 16;
+  calculatedHeight = Math.floor(calculatedHeight / 16) * 16;
+  return { width: calculatedWidth, height: calculatedHeight };
+};
+
+// ---- تحديث البطاقة ----
+const updateImageCard = (imgIndex, imgUrl) => {
+  const imgCard = document.getElementById(`img-card-${imgIndex}`);
+  if (!imgCard) return;
+  imgCard.classList.remove("loading");
+  imgCard.innerHTML = `
+    <img src="${imgUrl}" class="result-img"/>
+    <div class="img-overlay">
+      <a href="${imgUrl}" class="img-download-btn" download="${Date.now()}.png">
+        <i class="fa-solid fa-download"></i>
+      </a>
+    </div>`;
+};
+
+// ---- التوليد عبر AI Horde ----
+const generateImages = async (selectModel, selectCount, selectRatio, prompt) => {
+    const { width, height } = getImageDimensions(selectRatio);
+  
+    const payload = {
+      prompt: prompt,
+      params: {
+        n: selectCount,       // عدد الصور
+        width: width,
+        height: height,
+        steps: 25,
+        cfg_scale: 7,
+        sampler_name: "k_euler",
+      },
+      nsfw: false,
+      models: [selectModel],  // اسم النموذج ضمن مصفوفة
+    };
+  
+    try {
+      // إرسال الطلب
+      const response = await fetch("https://aihorde.net/api/v2/generate/async", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": HORDE_API_KEY,
+        },
+        body: JSON.stringify(payload),
+      });
+  
+      // التحقق من نجاح الطلب
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        console.error("Horde API Error:", errData);
+        throw new Error(errData.message || "Failed to start generation.");
+      }
+  
+      const data = await response.json();
+      const jobId = data.id;
+      if (!jobId) throw new Error("Failed to start generation.");
+  
+      console.log("🧠 Job started:", jobId);
+  
+      // الانتظار لحين انتهاء التوليد
+      let result;
+      while (true) {
+        const check = await fetch(`https://aihorde.net/api/v2/generate/status/${jobId}`);
+        const status = await check.json();
+  
+        if (status.done) {
+          result = status.generations;
+          break;
+        }
+  
+        // تحديث حالة البطاقة أثناء الانتظار
+        document.querySelectorAll(".status-text").forEach(el => el.textContent = `Generating... ${status.wait_time}s`);
+        await new Promise(r => setTimeout(r, 7000));
+      }
+  
+      // عرض الصور النهائية
+      if (result && result.length > 0) {
+        result.slice(0, selectCount).forEach((gen, i) => {
+          updateImageCard(i, gen.img);
+        });
+      } else {
+        throw new Error("No images returned from AI Horde.");
+      }
+  
+    } catch (err) {
+      console.error("Error:", err);
+    }
+  };
+  
+
+// ---- إنشاء البطاقات ----
+const createImageCards = (selectModel, selectCount, selectRatio, prompt) => {
+  galleryGrid.innerHTML = "";
+  for (let i = 0; i < selectCount; i++) {
+    galleryGrid.innerHTML += `
+      <div class="img-card loading" id="img-card-${i}" style="aspect-ratio:${selectRatio}">
+        <div class="status-container">
+          <div class="spinner"></div>
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <p class="status-text">Generating...</p>
+        </div>
+      </div>`;
+  }
+  generateImages(selectModel, selectCount, selectRatio, prompt);
+};
+
+// ---- عند الإرسال ----
+const hundleFormSubmit = (e) => {
+  e.preventDefault();
+  const selectModel = modelSelect.value || "stable_diffusion";
+  const selectCount = parseInt(countSelect.value) || 1;
+  const selectRatio = ratioSelect.value || "1/1";
+  const prompt = promptInput.value.trim() || "A beautiful landscape, 4k, ultra detailed";
+  createImageCards(selectModel, selectCount, selectRatio, prompt);
+};
+// ---- تحميل الصورة عند الضغط على أيقونة التحميل ----
+document.addEventListener('click', function (e) {
+    const downloadBtn = e.target.closest('.img-download-btn'); 
+    if (downloadBtn) {
+      e.preventDefault(); // منع فتح الصورة فقط
+      
+      const img = downloadBtn.closest('.img-card').querySelector('img');
+      const imageUrl = img.src;
+  
+      // إنشاء رابط تحميل مؤقت بنفس رابط الصورة (بدون fetch)
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.setAttribute('download', `generated_image_${Date.now()}.png`);
+      link.setAttribute('target', '_blank'); // fallback إذا لم يدعم المتصفح التحميل
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  });
+  
+  
+  
+
+// ---- الأحداث ----
+promptBtn.addEventListener('click', generateImage);
+themeToggle.addEventListener('click', toggleTheme);
+promptForm.addEventListener('submit', hundleFormSubmit);
