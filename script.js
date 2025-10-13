@@ -13,11 +13,21 @@ const HORDE_API_KEY = "Y6KL-bWBg9g9soKB7oYLPw";
 
 // أمثلة عشوائية
 const examplePrompts = [
-  "A magic forest with glowing plants and fairy homes among giant mushrooms",
-  "A futuristic Mars colony under glass domes with gardens",
-  "A dragon sleeping on gold coins in a crystal cave",
-  "A cyberpunk city with neon signs and flying cars at night",
-  "A Japanese shrine during cherry blossom season with lanterns",
+ "A glowing waterfall in a hidden jungle surrounded by bioluminescent plants",
+  "A futuristic floating city above the clouds powered by solar crystals",
+  "A peaceful lake reflecting a sky filled with twin moons and auroras",
+  "A giant ancient tree with houses built inside its branches, softly lit at night",
+  "A crystal desert with shimmering dunes under a purple sunset",
+  "An underwater temple with glowing coral and mysterious sea creatures",
+  "A mountain village above the clouds with floating lanterns at dusk",
+  "A sci-fi observatory on an alien planet surrounded by blue fog and glowing rocks",
+  "A magical garden where time stands still, filled with floating lights and rare flowers",
+  "A tranquil forest path illuminated by glowing fireflies and moonlight",
+  "A futuristic greenhouse on Mars growing alien plants in glass domes",
+  "A fantasy castle built on a cliff above a sea of mist, with dragons flying around",
+  "A glowing meadow at midnight under an enormous full moon",
+  "A city made of crystal towers reflecting rainbow light during sunrise",
+  "A serene winter village covered in snow with warm golden lights from cabins"
 ];
 
 // ---- تهيئة الثيم ----
@@ -163,7 +173,24 @@ const hundleFormSubmit = (e) => {
   const selectCount = parseInt(countSelect.value) || 1;
   const selectRatio = ratioSelect.value || "1/1";
   const prompt = promptInput.value.trim() || "A beautiful landscape, 4k, ultra detailed";
-  createImageCards(selectModel, selectCount, selectRatio, prompt);
+  //  فلتر للكلمات غير اللائقة (محتوى NSFW)
+const forbiddenWords = [
+  "nude", "naked", "nsfw", "sex", "erotic", "boobs", "breast", 
+  "underwear", "bikini", "lingerie", "nipple", "genital", "porn"
+];
+
+let safePrompt = prompt;
+for (const word of forbiddenWords) {
+  const regex = new RegExp("\\b" + word + "\\b", "gi");
+  safePrompt = safePrompt.replace(regex, "");
+}
+
+// إضافة عبارة تؤكد أن الصورة آمنة
+safePrompt += ", family-friendly, safe content, appropriate lighting, fully clothed";
+
+// توليد الصور بالكلمات الآمنة فقط
+createImageCards(selectModel, selectCount, selectRatio, safePrompt);
+
 };
 // ---- تحميل الصورة عند الضغط على أيقونة التحميل ----
 document.addEventListener('click', function (e) {
