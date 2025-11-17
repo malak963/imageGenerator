@@ -9,7 +9,7 @@ const ratioSelect = document.querySelector('#ratio-select');
 const galleryGrid = document.querySelector('.gallery-grid');
 
 // مفتاح AI Horde (احصلي عليه من https://aihorde.net/register)
-const HORDE_API_KEY = "Y6KL-bWBg9g9soKB7oYLPw";
+const HORDE_API_KEY = "Put your key here.";
 
 // أمثلة عشوائية
 const examplePrompts = [
